@@ -127,8 +127,8 @@ The OS-kernel on this system reports the following parameters:
         - Clock ticks per second:   100
 ```
 # To Do
-* Convert the program for the new procps-ng (version >= 4), using the libproc2 library.
+* Make LWP (Light Weight Processes, or threads) visible in the output.
 * Make use of the memory-pool for storage of the procps linked list, or
 * Remove the procps linked list completely, because we only access it once.
 
-The third bullit makes sense, but it might be better to keep the linked list around for future functional extensions of the program.  Let's first take on the conversion to the new library and then decide.
+The third bullit makes sense, but it might be better to keep the linked list around for future functional extensions of the program.

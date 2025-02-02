@@ -342,8 +342,10 @@ void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int t
                     delta_vsz,
                     cmd_metrics[i].metric_curr.rss,
                     delta_rss,
-                    utime,
-                    stime);
+//                    utime,   // Liever de totaaltelling dan de meting over het interval (zie onderstaand)
+//                    stime,   // Liever de totaaltelling dan de meting over het interval (zie onderstaand)
+                    ((float)cmd_metrics[i].metric_curr.utime)/ticks_per_sec,
+                    ((float)cmd_metrics[i].metric_curr.stime)/ticks_per_sec);
             }
         }
 	printf("\n");
