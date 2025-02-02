@@ -7,7 +7,7 @@
 #include <arpa/inet.h>
 #include <netinet/tcp.h>
 #include "mempool.h"
-#include "inode_stats.h"
+#include "inode-stats.h"
 
 void read_proc_file(char *fname, char **buf, long *size) {
 	FILE *fd;

@@ -36,12 +36,13 @@
 #include <signal.h>
 #include <features.h>
 #include <linux/limits.h>
-#include <proc/readproc.h>
+#include <libproc2/pids.h>
+#include "procps-pids.h"
 #include "mempool.h"
-#include "inode_stats.h"
+#include "inode-stats.h"
 #include "cmd-metrics.h"
 
-PROCTAB *proc;
+// PROCTAB *proc;
 
 void SIGTERM_handler(int sig) {
     shouldStop = true;
@@ -164,12 +165,28 @@ void list_procs(char cmd[CMD_LIST_LEN][CMD_STRING_LEN], int cmd_cnt, LLNODE_PROC
     }
     if (cmd_cnt > 0) {
         for (i=0; i<cmd_cnt; i++) {
-            if (strncmp(cmd[i], llnode_cur->proc_info->cmd, CMD_STRING_LEN) == 0) {
-                printf("%-25s%8d%8d%11d %-25s%14ld%14ld%10lld%10lld\n", llnode_cur->proc_info->cmd, llnode_cur->proc_info->tid, llnode_cur->proc_info->ppid, llnode_cur->proc_info->euid, llnode_cur->proc_info->euser, llnode_cur->proc_info->size * psize, llnode_cur->proc_info->rss * psize, llnode_cur->proc_info->utime, llnode_cur->proc_info->stime);
+            if (strncmp(cmd[i], llnode_cur->proc_info.cmd, CMD_STRING_LEN) == 0) {
+                printf("%-25s%8d%8d%11d %-25s%14ld%14ld%10lld%10lld\n", llnode_cur->proc_info.cmd,
+		                                                        llnode_cur->proc_info.pid,
+									llnode_cur->proc_info.ppid,
+									llnode_cur->proc_info.euid,
+									llnode_cur->proc_info.euser,
+									llnode_cur->proc_info.vsz,
+									llnode_cur->proc_info.rss,
+									llnode_cur->proc_info.utime,
+									llnode_cur->proc_info.stime);
             }
         }
     } else {
-        printf("%-25s%8d%8d%11d %-25s%14ld%14ld%10lld%10lld\n", llnode_cur->proc_info->cmd, llnode_cur->proc_info->tid, llnode_cur->proc_info->ppid, llnode_cur->proc_info->euid, llnode_cur->proc_info->euser, llnode_cur->proc_info->size * psize, llnode_cur->proc_info->rss * psize, llnode_cur->proc_info->utime, llnode_cur->proc_info->stime);
+        printf("%-25s%8d%8d%11d %-25s%14ld%14ld%10lld%10lld\n", llnode_cur->proc_info.cmd,
+	                                                        llnode_cur->proc_info.pid,
+								llnode_cur->proc_info.ppid,
+								llnode_cur->proc_info.euid,
+								llnode_cur->proc_info.euser,
+								llnode_cur->proc_info.vsz,
+								llnode_cur->proc_info.rss,
+								llnode_cur->proc_info.utime,
+								llnode_cur->proc_info.stime);
     }
 }
 
@@ -208,12 +225,12 @@ void accumulate_cmd_metrics(char cmd[CMD_LIST_LEN][CMD_STRING_LEN], int cmd_cnt,
     int i;
     if (cmd_cnt > 0) {
         for (i=0; i<cmd_cnt; i++) {
-            if (strncmp(cmd[i], llnode_cur->proc_info->cmd, CMD_STRING_LEN) == 0) {
+            if (strncmp(cmd[i], llnode_cur->proc_info.cmd, CMD_STRING_LEN) == 0) {
 	        cmd_metrics[i].process_cnt++;
-                cmd_metrics[i].metric_curr.vsz   += llnode_cur->proc_info->size * psize;
-                cmd_metrics[i].metric_curr.rss   += llnode_cur->proc_info->rss  * psize;
-                cmd_metrics[i].metric_curr.utime += llnode_cur->proc_info->utime;
-                cmd_metrics[i].metric_curr.stime += llnode_cur->proc_info->stime;
+                cmd_metrics[i].metric_curr.vsz   += llnode_cur->proc_info.vsz;
+                cmd_metrics[i].metric_curr.rss   += llnode_cur->proc_info.rss;
+                cmd_metrics[i].metric_curr.utime += llnode_cur->proc_info.utime;
+                cmd_metrics[i].metric_curr.stime += llnode_cur->proc_info.stime;
             }
         }
     } else {
@@ -335,6 +352,20 @@ void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int t
     }
 }
 
+void initialize_llnode_new(LLNODE_PROCINFO * llnode_new) {
+    memset(llnode_new, 0, sizeof(LLNODE_PROCINFO));
+    strncpy(llnode_new->proc_info.cmd, PIDS_VAL(pids_cmd,     str,     pids_stack_data, pids_info_data), CMD_STRING_LEN);
+    llnode_new->proc_info.euid  = PIDS_VAL(pids_euid,         u_int,   pids_stack_data, pids_info_data);
+    strncpy(llnode_new->proc_info.euser, PIDS_VAL(pids_euser, str,     pids_stack_data, pids_info_data), CMD_STRING_LEN);
+    llnode_new->proc_info.pid   = PIDS_VAL(pids_pid,          s_int,   pids_stack_data, pids_info_data);
+    llnode_new->proc_info.ppid  = PIDS_VAL(pids_ppid,         s_int,   pids_stack_data, pids_info_data);
+    llnode_new->proc_info.vsz   = PIDS_VAL(pids_vsz,          ul_int,  pids_stack_data, pids_info_data);
+    llnode_new->proc_info.rss   = PIDS_VAL(pids_rss,          ul_int,  pids_stack_data, pids_info_data);
+    llnode_new->proc_info.utime = PIDS_VAL(pids_utime,        ull_int, pids_stack_data, pids_info_data);
+    llnode_new->proc_info.stime = PIDS_VAL(pids_stime,        ull_int, pids_stack_data, pids_info_data);
+    llnode_new->next = NULL;
+}
+
 void current_time(char *time_string) {
     time_t timestamp;
     struct tm* tm_info;
@@ -370,6 +401,7 @@ int main(int argc, char **argv) {
     POOL **pool_ino_pp = &pool_ino;
     char *read_buf = NULL;
     long buflen = INITIAL_READBUF_SIZE;
+    char command[CMD_STRING_LEN];
 
     // Vraag de naam op van de file waar stdout naar schrijft (is waarschijnlijk gezet dmv een redirect).
     // Dit hebben we nodig voor de freopen van stdout in geval van een SIGHUP.
@@ -469,38 +501,48 @@ int main(int argc, char **argv) {
 
 LOOP_THIS_BABY_FOREVER:
 
-    if (uid_cnt > 0) {
-        proc = openproc(PROC_FILLMEM | PROC_FILLSTAT | PROC_FILLUSR | PROC_FILLSTATUS | PROC_UID, &uid, uid_cnt);
-    } else {
-        proc = openproc(PROC_FILLMEM | PROC_FILLSTAT | PROC_FILLUSR | PROC_FILLSTATUS);
-    }
-
-    // Lees de process table uit en vul de linked list
+    // Bouw een linked list op met records uit de process table.
     llnode_start = NULL;
     new_iter = true;
-    proc_t *readproc_ptr = (proc_t*) 1;
-    while (readproc_ptr != NULL) {
-        llnode_new = malloc(sizeof(LLNODE_PROCINFO));
-	memset(llnode_new, 0, sizeof(LLNODE_PROCINFO));
-        readproc_ptr = readproc(proc, NULL);
-	if (readproc_ptr == NULL) {
-	    free(llnode_new);
-	} else {
-	    llnode_new->proc_info = readproc_ptr;
-            llnode_new->next = NULL;
-            if (llnode_start == NULL) {
-                // Dit is de eerste iteratie, special case...
-                llnode_start = llnode_new;
-                llnode_cur   = llnode_new;
-            } else {
-                // Alle volgende nodes
-                llnode_cur->next = llnode_new;
-                llnode_cur       = llnode_new;
+    if (procps_pids_new(&pids_info_data, pids_items, number_of_items) < 0) {
+                fprintf(stderr, "ERROR - procps_pids_new failed\n");
+                exit(EXIT_FAILURE);
+    }
+    while ((pids_stack_data = procps_pids_get(pids_info_data, PIDS_FETCH_THREADS_TOO))) {
+        if (cmd_cnt > 0) {
+	    // Voeg alleen nodes toe voor de opgegeven commando's
+	    strncpy(command, PIDS_VAL(pids_cmd, str, pids_stack_data, pids_info_data), CMD_STRING_LEN);
+            for (i=0; i<cmd_cnt; i++) {
+                if (strncmp(cmd[i], command, CMD_STRING_LEN) == 0) {
+                    llnode_new = (struct procinfo_node *)malloc(sizeof(LLNODE_PROCINFO));
+                    initialize_llnode_new(llnode_new);
+                    if (llnode_start == NULL) {
+                        // Dit is de eerste iteratie, special case...
+                        llnode_start = llnode_new;
+                        llnode_cur   = llnode_new;
+                    } else {
+                        // Alle volgende nodes
+                        llnode_cur->next = llnode_new;
+                        llnode_cur       = llnode_new;
+                    }
+		}
             }
+        } else {
+	    // Voeg nodes toe voor ALLE procinfo records
+            llnode_new = (struct procinfo_node *)malloc(sizeof(LLNODE_PROCINFO));
+            initialize_llnode_new(llnode_new);
+            if (llnode_start == NULL) {
+                 // Dit is de eerste iteratie, special case...
+                 llnode_start = llnode_new;
+                 llnode_cur   = llnode_new;
+             } else {
+                 // Alle volgende nodes
+                 llnode_cur->next = llnode_new;
+                 llnode_cur       = llnode_new;
+             }
 	}
     }
-
-    closeproc(proc);
+    procps_pids_unref(&pids_info_data);
 
     // Initialiseer de cmd_metrics records en verzamel de socket-metrics.
     if (delta_mode) {
@@ -546,7 +588,7 @@ LOOP_THIS_BABY_FOREVER:
     llnode_cur = llnode_start;
     while (llnode_cur != NULL) {
         llnode_prv = llnode_cur;
-        freeproc(llnode_cur->proc_info);
+//        freeproc(llnode_cur->proc_info);
 	llnode_cur = llnode_cur->next;
 	free(llnode_prv);
     }
