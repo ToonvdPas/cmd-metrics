@@ -115,7 +115,7 @@ void print_syntax(long ticks_per_sec, long cpu_cnt, long psize, long physpages, 
                         "\n"
                         "Example 3 (process listing-mode):\n"
 			"        $ cmd-metrics\n"
-                        "        command          pid   ppid  euid euname          vsz        rss     utime    stime\n"
+                        "        command          pid   ppid  euid euser           vsz        rss     utime    stime\n"
                         "        systemd            1      0     0 root       57032704    8163328     28621    89512\n"
                         "        kthreadd           2      0     0 root              0          0         0      346\n"
                         "        kworker/0:0H       4      2     0 root              0          0         0        0\n"
@@ -127,7 +127,7 @@ void print_syntax(long ticks_per_sec, long cpu_cnt, long psize, long physpages, 
                         "\n"
                         "Example 4 (process listing-mode for specific uid's):\n"
                         "        $ ./cmd-metrics -u 992 -u 994\n"
-                        "        command          pid   ppid  euid euname          vsz        rss     utime    stime\n"
+                        "        command          pid   ppid  euid euser           vsz        rss     utime    stime\n"
                         "        nginx          34365  91602   994 nginx     583729152  218914816    105968    95669\n"
                         "        nginx          34366  91602   994 nginx     584949760  229904384    185921   130785\n"
                         "        nginx          34367  91602   994 nginx     597446656  263946240   1998303   944788\n"
@@ -157,36 +157,36 @@ void print_syntax(long ticks_per_sec, long cpu_cnt, long psize, long physpages, 
                         "        - Clock ticks per second:   %ld\n", cpu_cnt, physpages, physpages_avail, psize, physpages*psize/(1024*1024), ticks_per_sec);
 }
 
-void list_procs(char cmd[CMD_LIST_LEN][CMD_STRING_LEN], int cmd_cnt, LLNODE_PROCINFO *llnode_cur, size_t psize, bool first_iter) {
+void list_procs(char cmd[CMD_LIST_LEN][CMD_STRING_LEN], int cmd_cnt, LLNODE_PROCINFO *llnode_cur, size_t psize, bool first_iter, int ticks_per_sec) {
     int i;
 
     if (unlikely(first_iter)) {
-        printf("%-25s%8s%8s%11s %-25s%14s%14s%10s%10s\n", "command", "pid", "ppid", "euid", "euname", "vsz" ,"rss", "utime", "stime");
+        printf("%-32s%8s%8s%11s %-25s%14s%14s%10s%10s\n", "command", "pid", "ppid", "euid", "euser", "vsz" ,"rss", "utime", "stime");
     }
     if (cmd_cnt > 0) {
         for (i=0; i<cmd_cnt; i++) {
             if (strncmp(cmd[i], llnode_cur->proc_info.cmd, CMD_STRING_LEN) == 0) {
-                printf("%-25s%8d%8d%11d %-25s%14ld%14ld%10lld%10lld\n", llnode_cur->proc_info.cmd,
+                printf("%-32s%8d%8d%11d %-25s%14ld%14ld%10.2f%10.2f\n", llnode_cur->proc_info.cmd,
 		                                                        llnode_cur->proc_info.pid,
 									llnode_cur->proc_info.ppid,
 									llnode_cur->proc_info.euid,
 									llnode_cur->proc_info.euser,
 									llnode_cur->proc_info.vsz,
 									llnode_cur->proc_info.rss,
-									llnode_cur->proc_info.utime,
-									llnode_cur->proc_info.stime);
+								(float)(llnode_cur->proc_info.utime)/ticks_per_sec,
+								(float)(llnode_cur->proc_info.stime)/ticks_per_sec);
             }
         }
     } else {
-        printf("%-25s%8d%8d%11d %-25s%14ld%14ld%10lld%10lld\n", llnode_cur->proc_info.cmd,
+        printf("%-32s%8d%8d%11d %-25s%14ld%14ld%10.2f%10.2f\n", llnode_cur->proc_info.cmd,
 	                                                        llnode_cur->proc_info.pid,
 								llnode_cur->proc_info.ppid,
 								llnode_cur->proc_info.euid,
 								llnode_cur->proc_info.euser,
 								llnode_cur->proc_info.vsz,
 								llnode_cur->proc_info.rss,
-								llnode_cur->proc_info.utime,
-								llnode_cur->proc_info.stime);
+							(float)(llnode_cur->proc_info.utime)/ticks_per_sec,
+							(float)(llnode_cur->proc_info.stime)/ticks_per_sec);
     }
 }
 
@@ -283,10 +283,10 @@ void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int t
             printf("%-14s", "datetime");
             for (i=0; i<cmd_cnt; i++) {
                 if (sock_include) {
-                    printf("|%5s  %11s  %9s  %11s  %9s  %7s  %7s %5s %5s %5s %5s %5s %5s", "procs", "vsz", "delta-vsz", "rss", "delta-rss", "%utime", "%stime",
+                    printf("|%5s  %11s  %9s  %11s  %9s  %7s  %7s %5s %5s %5s %5s %5s %5s", "procs", "vsz", "delta-vsz", "rss", "delta-rss", "utime", "stime",
 		                                                                           "socks", "dsock", "estab", "cl_wt", "listn", "rest");
                 } else {
-                    printf("|%5s  %11s  %9s  %11s  %9s  %7s  %7s", "procs", "vsz", "delta-vsz", "rss", "delta-rss", "%utime", "%stime");
+                    printf("|%5s  %11s  %9s  %11s  %9s  %7s  %7s", "procs", "vsz", "delta-vsz", "rss", "delta-rss", "utime", "stime");
                 }
             }
 	    printf("\n");
@@ -295,8 +295,8 @@ void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int t
         printf("%14s", time_string);
         for (i=0; i<cmd_cnt; i++) {
             if (!first_iter) {
-                delta_vsz    = cmd_metrics[i].metric_curr.vsz             - cmd_metrics[i].metric_prev.vsz;
-                delta_rss    = cmd_metrics[i].metric_curr.rss             - cmd_metrics[i].metric_prev.rss;
+                delta_vsz = cmd_metrics[i].metric_curr.vsz - cmd_metrics[i].metric_prev.vsz;
+                delta_rss = cmd_metrics[i].metric_curr.rss - cmd_metrics[i].metric_prev.rss;
                 if (sock_include) {
                     delta_socket = cmd_metrics[i].metric_curr.sock.sock_total - cmd_metrics[i].metric_prev.sock.sock_total;
                 }
@@ -308,25 +308,27 @@ void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int t
                 // de context gaan bijhouden, en de in curr weggevallen processen ook negeren in prev.
                 // Dit is teveel werk.
                 if (cmd_metrics[i].metric_prev.utime < cmd_metrics[i].metric_curr.utime) {
-                    utime = (float) (cmd_metrics[i].metric_curr.utime - cmd_metrics[i].metric_prev.utime)/(ticks_per_sec*loop_interval)*100.0;
+                    utime = ((float)cmd_metrics[i].metric_curr.utime - (float)cmd_metrics[i].metric_prev.utime)/ticks_per_sec;
                 } else {
                     utime = (float) 0.0;
                 }
                 if (cmd_metrics[i].metric_prev.stime < cmd_metrics[i].metric_curr.stime) {
-                    stime = (float) (cmd_metrics[i].metric_curr.stime - cmd_metrics[i].metric_prev.stime)/(ticks_per_sec*loop_interval)*100.0;
+                    stime = ((float)cmd_metrics[i].metric_curr.stime - (float)cmd_metrics[i].metric_prev.stime)/ticks_per_sec;
                 } else {
                     stime = (float) 0.0;
                 }
             }
             if (sock_include) {
-                printf("|%5d  %11ld  %9ld  %11ld  %9ld  %7.1f  %7.1f %5ld %5ld %5ld %5ld %5ld %5ld",
+                printf("|%5d  %11ld  %9ld  %11ld  %9ld  %7.2f  %7.2f %5ld %5ld %5ld %5ld %5ld %5ld",
                     cmd_metrics[i].process_cnt,
                     cmd_metrics[i].metric_curr.vsz,
                     delta_vsz,
                     cmd_metrics[i].metric_curr.rss,
                     delta_rss,
-                    utime,
-                    stime,
+//                    utime,   // Liever de totaaltelling dan de meting over het interval (zie onderstaand)
+//                    stime,   // Liever de totaaltelling dan de meting over het interval (zie onderstaand)
+                    ((float)cmd_metrics[i].metric_curr.utime)/ticks_per_sec,
+                    ((float)cmd_metrics[i].metric_curr.stime)/ticks_per_sec,
                     cmd_metrics[i].metric_curr.sock.sock_total,
                     delta_socket,
                     cmd_metrics[i].metric_curr.sock.state.established,
@@ -334,7 +336,7 @@ void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int t
                     cmd_metrics[i].metric_curr.sock.state.listener,
                     cmd_metrics[i].metric_curr.sock.state.rest);
             } else {
-                printf("|%5d  %11ld  %9ld  %11ld  %9ld  %7.1f  %7.1f",
+                printf("|%5d  %11ld  %9ld  %11ld  %9ld  %7.2f  %7.2f",
                     cmd_metrics[i].process_cnt,
                     cmd_metrics[i].metric_curr.vsz,
                     delta_vsz,
@@ -561,7 +563,7 @@ LOOP_THIS_BABY_FOREVER:
         if (delta_mode) {
 	    accumulate_cmd_metrics(cmd, cmd_cnt, llnode_cur, psize, cmd_metrics);                  // cmd-metrics
 	} else {
-            list_procs(cmd, cmd_cnt, llnode_cur, psize, first_iter);
+            list_procs(cmd, cmd_cnt, llnode_cur, psize, first_iter, ticks_per_sec);
             if (unlikely(first_iter)) {
                 first_iter = false;
             }
@@ -578,10 +580,10 @@ LOOP_THIS_BABY_FOREVER:
         if (unlikely(first_iter)) {
             first_iter = false;
         }
-    } else {
-        if (loop_interval) {
-	    printf("\n");
-	}
+//    } else {
+//        if (loop_interval) {
+//	    printf("\n");
+//	}
     }
 
     // dealloceer de linked list en alle psproc-records waarnaar hij verwijst
