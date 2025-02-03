@@ -228,7 +228,7 @@ void sock_ino_destroy_hash_table(sock_ino_ent_t *hash_array[INO_HASH_SIZE], POOL
 sock_aggr_t * sock_ino_gather_cmd_stats(sock_ino_ent_t *hash_array[INO_HASH_SIZE], POOL **pool_ino, char *cmd) {
 	const char *root = getenv("PROC_ROOT") ? : "/proc/";
 	struct dirent *d;
-	char name[1024];
+	char name[INO_NAME_LEN_MAX];
 	int nameoff;
 	DIR *dir;
 	sock_ino_ent_t *p;
@@ -249,10 +249,10 @@ sock_aggr_t * sock_ino_gather_cmd_stats(sock_ino_ent_t *hash_array[INO_HASH_SIZE
 	memset(s, 0, sizeof(sock_aggr_t));
 
 	strcpy(name, root);
-	if (strlen(name) == 0 || name[strlen(name)-1] != '/')
+	if (strnlen(name, INO_NAME_LEN_MAX) == 0 || name[strnlen(name, INO_NAME_LEN_MAX)-1] != '/')
 		strcat(name, "/");
 
-	nameoff = strlen(name);
+	nameoff = strnlen(name, INO_NAME_LEN_MAX);
 
 	// Open de directory /proc/
 //	printf("INFO - Opening directory %s\n", name);                                        // DEBUG
@@ -301,7 +301,7 @@ sock_aggr_t * sock_ino_gather_cmd_stats(sock_ino_ent_t *hash_array[INO_HASH_SIZE
 		// In geval van een error gaan we gewoon door, want wanneer wanneer je niet
 		// als root draait heb je geen toegang tot de FD-directories van alle PID's.
 		sprintf(name + nameoff, "%d/fd/", pid);
-		pos = strlen(name);
+		pos = strnlen(name, INO_NAME_LEN_MAX);
 		if ((dir1 = opendir(name)) == NULL)
 			continue;
 
