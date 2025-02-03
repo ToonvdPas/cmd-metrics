@@ -26,6 +26,7 @@ typedef struct sock_aggr    sock_aggr_t;
 
 #define INO_HASH_SIZE 256
 #define INITIAL_READBUF_SIZE (1024*1024)
+#define INO_PROCESS_LEN_MAX 16
 
 void sock_ino_build_hash_table(sock_ino_ent_t *hash_array[INO_HASH_SIZE], POOL **pool_ino, char **read_buf, long *buflen);
 void sock_ino_destroy_hash_table(sock_ino_ent_t *hash_array[INO_HASH_SIZE], POOL *pool_ino);

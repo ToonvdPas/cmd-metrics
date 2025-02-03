@@ -264,7 +264,7 @@ sock_aggr_t * sock_ino_gather_cmd_stats(sock_ino_ent_t *hash_array[INO_HASH_SIZE
 
 	while ((d = readdir(dir)) != NULL) {
 		struct dirent *d1;
-		char process[16];
+		char process[INO_PROCESS_LEN_MAX+1];
 		int pid, pos;
 		DIR *dir1;
 		char crap;
@@ -290,7 +290,7 @@ sock_aggr_t * sock_ino_gather_cmd_stats(sock_ino_ent_t *hash_array[INO_HASH_SIZE
 		}
 
 		// Check of dit de gevraagde cmd-naam is, zoek anders verder
-		if (strncmp(cmd, process, strlen(process))) {
+		if (strncmp(cmd, process, strnlen(cmd, INO_PROCESS_LEN_MAX))) {
 //			printf("Compare: %s != %s\n", cmd, process);  // DEBUG
 			continue;
 //		} else {                                              // DEBUG

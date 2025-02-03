@@ -70,7 +70,10 @@ void print_syntax(long ticks_per_sec, long cpu_cnt, long psize, long physpages, 
                         "        -d                 Activate delta-mode.  (this was the only single reason for writing this tool!)\n"
 			"        -h                 This help text.\n"
                         "        -i <interval>      Interval in seconds.\n"
-                        "        -c <command>       Program name (executable) to filter on.  Multiple -c arguments are allowed.\n"
+                        "        -c <command>       Program name (executable) to filter on.\n"
+			"                           Multiple -c arguments are allowed.\n"
+			"                           When specifying only part of a command, all processes\n"
+			"                           whose command name start with that string will be matched.\n"
                         "        -s                 Switches on the socket-counting.\n"
                         "        -r <repeat-header> printing-interval for the heading (only for the delta-mode)\n"
                         "                           -1: only print heading at start of run\n"
@@ -85,6 +88,9 @@ void print_syntax(long ticks_per_sec, long cpu_cnt, long psize, long physpages, 
                         "It is called the 'delta-mode' of the tool, which is activated by the argument -d.\n"
                         "See examples 1 and 2.\n"
                         "\n"
+			"Note: rss (resident segment size) and vsz (virtual segment size) are in KiB units.\n"
+			"      utime (user time) and stime (system time) are in seconds since the start.\n"
+			"\n"
                         "Example 1 (delta-mode without socket-counting):\n"
                         "        # ./cmd-metrics -d -c nginx -c cache-main -i 5\n"
                         "                      |nginx                                                                  |cache-main\n"
@@ -165,7 +171,7 @@ void list_procs(char cmd[CMD_LIST_LEN][CMD_STRING_LEN], int cmd_cnt, LLNODE_PROC
     }
     if (cmd_cnt > 0) {
         for (i=0; i<cmd_cnt; i++) {
-            if (strncmp(cmd[i], llnode_cur->proc_info.cmd, CMD_STRING_LEN) == 0) {
+            if (strncmp(cmd[i], llnode_cur->proc_info.cmd, strnlen(cmd[i], CMD_STRING_LEN)) == 0) {
                 printf("%-32s%8d%8d%11d %-25s%14ld%14ld%10.2f%10.2f\n", llnode_cur->proc_info.cmd,
 		                                                        llnode_cur->proc_info.pid,
 									llnode_cur->proc_info.ppid,
@@ -225,7 +231,7 @@ void accumulate_cmd_metrics(char cmd[CMD_LIST_LEN][CMD_STRING_LEN], int cmd_cnt,
     int i;
     if (cmd_cnt > 0) {
         for (i=0; i<cmd_cnt; i++) {
-            if (strncmp(cmd[i], llnode_cur->proc_info.cmd, CMD_STRING_LEN) == 0) {
+            if (strncmp(cmd[i], llnode_cur->proc_info.cmd, strnlen(cmd[i], CMD_STRING_LEN)) == 0) {
 	        cmd_metrics[i].process_cnt++;
                 cmd_metrics[i].metric_curr.vsz   += llnode_cur->proc_info.vsz;
                 cmd_metrics[i].metric_curr.rss   += llnode_cur->proc_info.rss;
@@ -273,9 +279,9 @@ void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int t
             printf("%14s", " ");
             for (i=0; i<cmd_cnt; i++) {
                 if (sock_include) {
-                    printf("|%-107s", cmd_metrics[i].cmd);
+                    printf("|%-109s", cmd_metrics[i].cmd);
                 } else {
-                    printf("|%-71s", cmd_metrics[i].cmd);
+                    printf("|%-73s", cmd_metrics[i].cmd);
                 }
             }
 	    printf("\n");
@@ -283,10 +289,10 @@ void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int t
             printf("%-14s", "datetime");
             for (i=0; i<cmd_cnt; i++) {
                 if (sock_include) {
-                    printf("|%5s  %11s  %9s  %11s  %9s  %7s  %7s %5s %5s %5s %5s %5s %5s", "procs", "vsz", "delta-vsz", "rss", "delta-rss", "utime", "stime",
+                    printf("|%5s  %11s  %9s  %11s  %9s  %8s  %8s %5s %5s %5s %5s %5s %5s", "procs", "vsz", "delta-vsz", "rss", "delta-rss", "utime", "stime",
 		                                                                           "socks", "dsock", "estab", "cl_wt", "listn", "rest");
                 } else {
-                    printf("|%5s  %11s  %9s  %11s  %9s  %7s  %7s", "procs", "vsz", "delta-vsz", "rss", "delta-rss", "utime", "stime");
+                    printf("|%5s  %11s  %9s  %11s  %9s  %8s  %8s", "procs", "vsz", "delta-vsz", "rss", "delta-rss", "utime", "stime");
                 }
             }
 	    printf("\n");
@@ -319,7 +325,7 @@ void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int t
                 }
             }
             if (sock_include) {
-                printf("|%5d  %11ld  %9ld  %11ld  %9ld  %7.2f  %7.2f %5ld %5ld %5ld %5ld %5ld %5ld",
+                printf("|%5d  %11ld  %9ld  %11ld  %9ld  %8.2f  %8.2f %5ld %5ld %5ld %5ld %5ld %5ld",
                     cmd_metrics[i].process_cnt,
                     cmd_metrics[i].metric_curr.vsz,
                     delta_vsz,
@@ -336,7 +342,7 @@ void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int t
                     cmd_metrics[i].metric_curr.sock.state.listener,
                     cmd_metrics[i].metric_curr.sock.state.rest);
             } else {
-                printf("|%5d  %11ld  %9ld  %11ld  %9ld  %7.2f  %7.2f",
+                printf("|%5d  %11ld  %9ld  %11ld  %9ld  %8.2f  %8.2f",
                     cmd_metrics[i].process_cnt,
                     cmd_metrics[i].metric_curr.vsz,
                     delta_vsz,
@@ -517,7 +523,7 @@ LOOP_THIS_BABY_FOREVER:
 	    // Voeg alleen nodes toe voor de opgegeven commando's
 	    strncpy(command, PIDS_VAL(pids_cmd, str, pids_stack_data, pids_info_data), CMD_STRING_LEN);
             for (i=0; i<cmd_cnt; i++) {
-                if (strncmp(cmd[i], command, CMD_STRING_LEN) == 0) {
+                if (strncmp(cmd[i], command, strnlen(cmd[i], CMD_STRING_LEN)) == 0) {
                     llnode_new = (struct procinfo_node *)malloc(sizeof(LLNODE_PROCINFO));
                     initialize_llnode_new(llnode_new);
                     if (llnode_start == NULL) {
