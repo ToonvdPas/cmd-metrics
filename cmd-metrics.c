@@ -75,10 +75,13 @@ void print_syntax(long ticks_per_sec, long cpu_cnt, long psize, long physpages, 
 			"                           When specifying only part of a command, all processes\n"
 			"                           whose command name start with that string will be matched.\n"
                         "        -s                 Switches on the socket-counting.\n"
+			"                           This option is only available in combination with the delta mode.\n"
                         "        -r <repeat-header> printing-interval for the heading (only for the delta-mode)\n"
                         "                           -1: only print heading at start of run\n"
                         "                            0: don't print heading at all\n"
                         "                           >0: heading-interval in number of lines\n"
+			"        -t                 Include threads (Light Weight Processes, LWP) in the listing.\n"
+			"                           This option cannot be combined with the delta mode.\n"
                         "        -u <uid>           Numeric userid to filter on.  Multiple -u arguments are allowed.\n"
                         "\n"
                         "This program collects some performance data for specific programs.\n"
@@ -163,36 +166,32 @@ void print_syntax(long ticks_per_sec, long cpu_cnt, long psize, long physpages, 
                         "        - Clock ticks per second:   %ld\n", cpu_cnt, physpages, physpages_avail, psize, physpages*psize/(1024*1024), ticks_per_sec);
 }
 
-void list_procs(char cmd[CMD_LIST_LEN][CMD_STRING_LEN], int cmd_cnt, LLNODE_PROCINFO *llnode_cur, size_t psize, bool first_iter, int ticks_per_sec) {
+void list_procs(char cmd[CMD_LIST_LEN][CMD_STRING_LEN], int cmd_cnt, LLNODE_PROCINFO *llnode_cur, size_t psize, bool first_iter, bool include_threads, int ticks_per_sec) {
     int i;
 
     if (unlikely(first_iter)) {
-        printf("%-32s%8s%8s%11s %-25s%14s%14s%10s%10s\n", "command", "pid", "ppid", "euid", "euser", "vsz" ,"rss", "utime", "stime");
+        if (include_threads) {
+            printf(LIST_PROCS_HEADER_FMT_STR_WITH_THREADS, LIST_PROCS_HEADER_PR_ARGS_WITH_THREADS);
+	} else {
+            printf(LIST_PROCS_HEADER_FMT_STR_NO_THREADS, LIST_PROCS_HEADER_PR_ARGS_NO_THREADS);
+	}
     }
     if (cmd_cnt > 0) {
         for (i=0; i<cmd_cnt; i++) {
             if (strncmp(cmd[i], llnode_cur->proc_info.cmd, strnlen(cmd[i], CMD_STRING_LEN)) == 0) {
-                printf("%-32s%8d%8d%11d %-25s%14ld%14ld%10.2f%10.2f\n", llnode_cur->proc_info.cmd,
-		                                                        llnode_cur->proc_info.pid,
-									llnode_cur->proc_info.ppid,
-									llnode_cur->proc_info.euid,
-									llnode_cur->proc_info.euser,
-									llnode_cur->proc_info.vsz,
-									llnode_cur->proc_info.rss,
-								(float)(llnode_cur->proc_info.utime)/ticks_per_sec,
-								(float)(llnode_cur->proc_info.stime)/ticks_per_sec);
+                if (include_threads) {
+                    printf(LIST_PROCS_FMT_STR_WITH_THREADS, LIST_PROCS_PR_ARGS_WITH_THREADS);
+                } else {
+                    printf(LIST_PROCS_FMT_STR_NO_THREADS, LIST_PROCS_PR_ARGS_NO_THREADS);
+                }
             }
         }
     } else {
-        printf("%-32s%8d%8d%11d %-25s%14ld%14ld%10.2f%10.2f\n", llnode_cur->proc_info.cmd,
-	                                                        llnode_cur->proc_info.pid,
-								llnode_cur->proc_info.ppid,
-								llnode_cur->proc_info.euid,
-								llnode_cur->proc_info.euser,
-								llnode_cur->proc_info.vsz,
-								llnode_cur->proc_info.rss,
-							(float)(llnode_cur->proc_info.utime)/ticks_per_sec,
-							(float)(llnode_cur->proc_info.stime)/ticks_per_sec);
+        if (include_threads) {
+            printf(LIST_PROCS_FMT_STR_WITH_THREADS, LIST_PROCS_PR_ARGS_WITH_THREADS);
+        } else {
+            printf(LIST_PROCS_FMT_STR_NO_THREADS, LIST_PROCS_PR_ARGS_NO_THREADS);
+        }
     }
 }
 
@@ -266,7 +265,7 @@ void accumulate_sock_metrics(char cmd[CMD_LIST_LEN][CMD_STRING_LEN], POOL **pool
     }
 }
 
-void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int ticks_per_sec, int loop_interval, int heading_interval, bool sock_include, bool first_iter, long *line_cnt) {
+void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int ticks_per_sec, int loop_interval, int heading_interval, bool include_sockets, bool first_iter, long *line_cnt) {
     long delta_vsz = 0, delta_rss = 0, delta_socket = 0;
     float utime = 0, stime = 0;
     int i;
@@ -278,7 +277,7 @@ void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int t
             // druk eerste heading-regel af (procesnamen)
             printf("%14s", " ");
             for (i=0; i<cmd_cnt; i++) {
-                if (sock_include) {
+                if (include_sockets) {
                     printf("|%-109s", cmd_metrics[i].cmd);
                 } else {
                     printf("|%-73s", cmd_metrics[i].cmd);
@@ -288,7 +287,7 @@ void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int t
             // druk tweede heading-regel af (kolomnamen)
             printf("%-14s", "datetime");
             for (i=0; i<cmd_cnt; i++) {
-                if (sock_include) {
+                if (include_sockets) {
                     printf("|%5s  %11s  %9s  %11s  %9s  %8s  %8s %5s %5s %5s %5s %5s %5s", "procs", "vsz", "delta-vsz", "rss", "delta-rss", "utime", "stime",
 		                                                                           "socks", "dsock", "estab", "cl_wt", "listn", "rest");
                 } else {
@@ -303,7 +302,7 @@ void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int t
             if (!first_iter) {
                 delta_vsz = cmd_metrics[i].metric_curr.vsz - cmd_metrics[i].metric_prev.vsz;
                 delta_rss = cmd_metrics[i].metric_curr.rss - cmd_metrics[i].metric_prev.rss;
-                if (sock_include) {
+                if (include_sockets) {
                     delta_socket = cmd_metrics[i].metric_curr.sock.sock_total - cmd_metrics[i].metric_prev.sock.sock_total;
                 }
                 // Het kan voorkomen dat één of meer processen tijdens de meetinterval gestopt zijn.
@@ -324,7 +323,7 @@ void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int t
                     stime = (float) 0.0;
                 }
             }
-            if (sock_include) {
+            if (include_sockets) {
                 printf("|%5d  %11ld  %9ld  %11ld  %9ld  %8.2f  %8.2f %5ld %5ld %5ld %5ld %5ld %5ld",
                     cmd_metrics[i].process_cnt,
                     cmd_metrics[i].metric_curr.vsz,
@@ -369,6 +368,7 @@ void initialize_llnode_new(LLNODE_PROCINFO * llnode_new) {
     strncpy(llnode_new->proc_info.euser, PIDS_VAL(pids_euser, str,     pids_stack_data, pids_info_data), CMD_STRING_LEN);
     llnode_new->proc_info.pid   = PIDS_VAL(pids_pid,          s_int,   pids_stack_data, pids_info_data);
     llnode_new->proc_info.ppid  = PIDS_VAL(pids_ppid,         s_int,   pids_stack_data, pids_info_data);
+    llnode_new->proc_info.tgid  = PIDS_VAL(pids_tgid,         s_int,   pids_stack_data, pids_info_data);
     llnode_new->proc_info.vsz   = PIDS_VAL(pids_vsz,          ul_int,  pids_stack_data, pids_info_data);
     llnode_new->proc_info.rss   = PIDS_VAL(pids_rss,          ul_int,  pids_stack_data, pids_info_data);
     llnode_new->proc_info.utime = PIDS_VAL(pids_utime,        ull_int, pids_stack_data, pids_info_data);
@@ -395,7 +395,8 @@ int main(int argc, char **argv) {
     char cmd[CMD_LIST_LEN][CMD_STRING_LEN];    // eventuele programmanaam waarop gefilterd moet worden
     uid_t uid[UID_LIST_LEN];                   // eventuele UID waaop gefilterd moet worden
     bool delta_mode = false;                   // start op in delta-mode yes/no
-    bool sock_include = false;                 // doe ook TCP-socket tellingen yes/no
+    bool include_sockets = false;                 // verzamel ook de tellingen van de TCP-sockets
+    bool include_threads = false;              // vraag ook de threads (LWP's) van de processen op
     bool first_iter = true, new_iter = true;
     int uid_cnt = 0;
     int cmd_cnt = 0;
@@ -405,7 +406,7 @@ int main(int argc, char **argv) {
     int i;
     char time_string[TIME_STRING_LEN];
     int option;
-    char *optstring = "c:dhi:r:su:";
+    char *optstring = "c:dhi:r:stu:";
     char *end_ptr;
     POOL *pool_ino;
     POOL **pool_ino_pp = &pool_ino;
@@ -455,7 +456,9 @@ int main(int argc, char **argv) {
                       exit(EXIT_FAILURE);
                   }
                   break;
-        case 's': sock_include = true;
+        case 's': include_sockets = true;
+                  break;
+        case 't': include_threads = true;
                   break;
         case 'i': loop_interval = strtol(optarg, &end_ptr, 10);
                   if (*end_ptr != '\0') {
@@ -487,6 +490,16 @@ int main(int argc, char **argv) {
         option = getopt(argc, argv, optstring);
     }
 
+    if (include_threads && delta_mode) {
+        fprintf(stderr, "ERROR: the threads option (-t) is not supported in delta-mode (-d), because it makes no sense.\n");
+	exit(EXIT_FAILURE);
+    }
+
+    if (include_sockets && !delta_mode) {
+        fprintf(stderr, "ERROR: the sockets option (-s) is only supported in delta-mode (-d).\n");
+	exit(EXIT_FAILURE);
+    }
+
     // Voor delta-processing, plaats de opgegeven cmd-namen in de cmd_metrics tabel
     if (delta_mode) {
         if (cmd_cnt > 0) {
@@ -500,7 +513,7 @@ int main(int argc, char **argv) {
     }
 
     // Creëer de memory-pool voor de opslag van de socket-hashtabel.
-    if (sock_include)
+    if (include_sockets)
         pool_ino = pool_create(POOL_SIZE_INO);
 
     // Definieer pointers naar de nodes voor de procps linked list.
@@ -518,7 +531,7 @@ LOOP_THIS_BABY_FOREVER:
                 fprintf(stderr, "ERROR - procps_pids_new failed\n");
                 exit(EXIT_FAILURE);
     }
-    while ((pids_stack_data = procps_pids_get(pids_info_data, PIDS_FETCH_THREADS_TOO))) {
+    while ((pids_stack_data = procps_pids_get(pids_info_data, include_threads ? PIDS_FETCH_THREADS_TOO : PIDS_FETCH_TASKS_ONLY))) {
         if (cmd_cnt > 0) {
 	    // Voeg alleen nodes toe voor de opgegeven commando's
 	    strncpy(command, PIDS_VAL(pids_cmd, str, pids_stack_data, pids_info_data), CMD_STRING_LEN);
@@ -557,7 +570,7 @@ LOOP_THIS_BABY_FOREVER:
     // Initialiseer de cmd_metrics records en verzamel de socket-metrics.
     if (delta_mode) {
         initialize_metrics(cmd_cnt, cmd_metrics);
-        if (sock_include) {
+        if (include_sockets) {
             accumulate_sock_metrics(cmd, pool_ino_pp, cmd_cnt, cmd_metrics, &read_buf, &buflen);   // socket-metrics
         }
     }
@@ -571,7 +584,7 @@ LOOP_THIS_BABY_FOREVER:
         if (delta_mode) {
 	    accumulate_cmd_metrics(cmd, cmd_cnt, llnode_cur, psize, cmd_metrics);                  // cmd-metrics
 	} else {
-            list_procs(cmd, cmd_cnt, llnode_cur, psize, first_iter, ticks_per_sec);
+            list_procs(cmd, cmd_cnt, llnode_cur, psize, first_iter, include_threads, ticks_per_sec);
             if (unlikely(first_iter)) {
                 first_iter = false;
             }
@@ -584,21 +597,16 @@ LOOP_THIS_BABY_FOREVER:
     // De array cmd_metrics[] bevat één record per opgegeven commando (-c).
     if (delta_mode) {
         current_time(time_string);
-        list_deltas(cmd_cnt, cmd_metrics, time_string, ticks_per_sec, loop_interval, heading_interval, sock_include, first_iter, &line_cnt);
+        list_deltas(cmd_cnt, cmd_metrics, time_string, ticks_per_sec, loop_interval, heading_interval, include_sockets, first_iter, &line_cnt);
         if (unlikely(first_iter)) {
             first_iter = false;
         }
-//    } else {
-//        if (loop_interval) {
-//	    printf("\n");
-//	}
     }
 
     // dealloceer de linked list en alle psproc-records waarnaar hij verwijst
     llnode_cur = llnode_start;
     while (llnode_cur != NULL) {
         llnode_prv = llnode_cur;
-//        freeproc(llnode_cur->proc_info);
 	llnode_cur = llnode_cur->next;
 	free(llnode_prv);
     }
