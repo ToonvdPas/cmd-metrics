@@ -361,7 +361,7 @@ void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int t
     }
 }
 
-void initialize_llnode_new(LLNODE_PROCINFO * llnode_new) {
+void populate_linked_list_node(LLNODE_PROCINFO * llnode_new) {
     memset(llnode_new, 0, sizeof(LLNODE_PROCINFO));
     strncpy(llnode_new->proc_info.cmd, PIDS_VAL(pids_cmd,     str,     pids_stack_data, pids_info_data), CMD_STRING_LEN);
     llnode_new->proc_info.euid  = PIDS_VAL(pids_euid,         u_int,   pids_stack_data, pids_info_data);
@@ -374,6 +374,34 @@ void initialize_llnode_new(LLNODE_PROCINFO * llnode_new) {
     llnode_new->proc_info.utime = PIDS_VAL(pids_utime,        ull_int, pids_stack_data, pids_info_data);
     llnode_new->proc_info.stime = PIDS_VAL(pids_stime,        ull_int, pids_stack_data, pids_info_data);
     llnode_new->next = NULL;
+}
+
+void add_linked_list_node(LLNODE_PROCINFO **llnode_start, LLNODE_PROCINFO **llnode_cur) {
+    LLNODE_PROCINFO *llnode_new = NULL;
+
+    llnode_new = (struct procinfo_node *)malloc(sizeof(LLNODE_PROCINFO));
+    populate_linked_list_node(llnode_new);
+    if (*llnode_start == NULL) {
+         // Dit is de eerste iteratie, special case...
+         *llnode_start = llnode_new;
+         *llnode_cur   = llnode_new;
+     } else {
+         // Alle volgende nodes
+         (*llnode_cur)->next = llnode_new;
+         *llnode_cur         = llnode_new;
+     }
+}
+
+void destroy_linked_list(LLNODE_PROCINFO *llnode_start) {
+    LLNODE_PROCINFO *llnode_cur = NULL,
+                    *llnode_prv = NULL;
+
+    llnode_cur = llnode_start;
+    while (llnode_cur != NULL) {
+        llnode_prv = llnode_cur;
+	llnode_cur = llnode_cur->next;
+	free(llnode_prv);
+    }
 }
 
 void current_time(char *time_string) {
@@ -519,8 +547,7 @@ int main(int argc, char **argv) {
     // Definieer pointers naar de nodes voor de procps linked list.
     LLNODE_PROCINFO *llnode_start = NULL,
                     *llnode_prv = NULL,
-                    *llnode_cur = NULL,
-		    *llnode_new = NULL;
+                    *llnode_cur = NULL;
 
 LOOP_THIS_BABY_FOREVER:
 
@@ -533,37 +560,17 @@ LOOP_THIS_BABY_FOREVER:
     }
     while ((pids_stack_data = procps_pids_get(pids_info_data, include_threads ? PIDS_FETCH_THREADS_TOO : PIDS_FETCH_TASKS_ONLY))) {
         if (cmd_cnt > 0) {
-	    // Voeg alleen nodes toe voor de opgegeven commando's
-	    strncpy(command, PIDS_VAL(pids_cmd, str, pids_stack_data, pids_info_data), CMD_STRING_LEN);
+            // Voeg alleen nodes toe voor de opgegeven commando's
+            strncpy(command, PIDS_VAL(pids_cmd, str, pids_stack_data, pids_info_data), CMD_STRING_LEN);
             for (i=0; i<cmd_cnt; i++) {
                 if (strncmp(cmd[i], command, strnlen(cmd[i], CMD_STRING_LEN)) == 0) {
-                    llnode_new = (struct procinfo_node *)malloc(sizeof(LLNODE_PROCINFO));
-                    initialize_llnode_new(llnode_new);
-                    if (llnode_start == NULL) {
-                        // Dit is de eerste iteratie, special case...
-                        llnode_start = llnode_new;
-                        llnode_cur   = llnode_new;
-                    } else {
-                        // Alle volgende nodes
-                        llnode_cur->next = llnode_new;
-                        llnode_cur       = llnode_new;
-                    }
-		}
+                    add_linked_list_node(&llnode_start, &llnode_cur);
+                }
             }
         } else {
-	    // Voeg nodes toe voor ALLE procinfo records
-            llnode_new = (struct procinfo_node *)malloc(sizeof(LLNODE_PROCINFO));
-            initialize_llnode_new(llnode_new);
-            if (llnode_start == NULL) {
-                 // Dit is de eerste iteratie, special case...
-                 llnode_start = llnode_new;
-                 llnode_cur   = llnode_new;
-             } else {
-                 // Alle volgende nodes
-                 llnode_cur->next = llnode_new;
-                 llnode_cur       = llnode_new;
-             }
-	}
+            // Voeg nodes toe voor ALLE procinfo records
+            add_linked_list_node(&llnode_start, &llnode_cur);
+        }
     }
     procps_pids_unref(&pids_info_data);
 
@@ -603,14 +610,10 @@ LOOP_THIS_BABY_FOREVER:
         }
     }
 
-    // dealloceer de linked list en alle psproc-records waarnaar hij verwijst
-    llnode_cur = llnode_start;
-    while (llnode_cur != NULL) {
-        llnode_prv = llnode_cur;
-	llnode_cur = llnode_cur->next;
-	free(llnode_prv);
-    }
+    // Ruim de linked list op.
+    destroy_linked_list(llnode_start);
 
+    // Handel de signals af.
     if (loop_interval > 0) {
         // Block het programma totdat de itimer afloopt en we een SIGALRM ontvangen.
         pause();
@@ -628,7 +631,7 @@ LOOP_THIS_BABY_FOREVER:
 		    fprintf(stderr, "WARNING: freopen of %s failed: %d (%s)\n", stdout_path, errno, strerror(errno));
 		}
             }
-            // GOTO's are not always harmful...
+            // GOTO's zijn niet altijd slecht.
             goto LOOP_THIS_BABY_FOREVER;
         }
     }
