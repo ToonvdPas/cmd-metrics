@@ -60,59 +60,65 @@ void SIGALRM_handler(int sig) {
     // no-op
 }
 
-void print_syntax(long ticks_per_sec, long cpu_cnt, long psize, long physpages, long physpages_avail) {
+void print_syntax(long ticks_per_sec, long cpu_cnt, long pagesize, long physpages, long physpages_avail) {
         fprintf(stderr, "syntax: $ cmd-metrics -d -c <cmd> [-c <cmd> ...] [-i <interval (s)>] [-r <repeat-header>] [-s]\n"
-                        "    or: $ cmd-metrics -u <uid>   (list of processes for numeric uid)\n"
-                        "    or: $ cmd-metrics            (full list of processes)\n"
+                        "    or: $ cmd-metrics -u <uid> [-u <uid> ...]     (list processes running with a specific numeric uid)\n"
+                        "    or: $ cmd-metrics -c <cmd> [-c <cmd> ...]     (list processes running with a specific command)\n"
+                        "    or: $ cmd-metrics -u <uid> -a [-c <cmd> ...]  (list processes running with a specific uid AND command)\n"
+                        "    or: $ cmd-metrics [-t]                        (full list of processes, optionally including LWP's (threads))\n"
                         "    or: $ cmd-metrics -h         (this help text)\n"
 	                "\n"
                         "Arguments:\n"
-                        "        -d                 Activate delta-mode.  (this was the only single reason for writing this tool!)\n"
-			"        -h                 This help text.\n"
-                        "        -i <interval>      Interval in seconds.\n"
+			"        -a                 Switch the filter options (-c and -u) to AND mode.  (default mode is OR)\n"
+			"                           In the AND mode, proc-records are only listed if both cmd and uid match.\n"
                         "        -c <command>       Program name (executable) to filter on.\n"
 			"                           Multiple -c arguments are allowed.\n"
-			"                           When specifying only part of a command, all processes\n"
-			"                           whose command name start with that string will be matched.\n"
-                        "        -s                 Switches on the socket-counting.\n"
-			"                           This option is only available in combination with the delta mode.\n"
-                        "        -r <repeat-header> printing-interval for the heading (only for the delta-mode)\n"
+			"                           When specifying only part of a command, it will match all processes\n"
+			"                           whose command name start with that string.\n"
+                        "        -d                 Delta-mode.  In this mode the program calculates the allocation and\n"
+			"                           release of resources.  Those resources are VSZ, RSS, and (optionally) sockets.\n"
+			"        -h                 This help text.\n"
+                        "        -i <interval>      Interval in seconds.\n"
+                        "        -s                 Provide some information on socket use.\n"
+			"                           This option is only available in delta mode.\n"
+                        "        -r <repeat-header> Interval for printing the header line. (only has effect in delta-mode)\n"
                         "                           -1: only print heading at start of run\n"
                         "                            0: don't print heading at all\n"
                         "                           >0: heading-interval in number of lines\n"
 			"        -t                 Include threads (Light Weight Processes, LWP) in the listing.\n"
-			"                           This option cannot be combined with the delta mode.\n"
+			"                           This option does not work in delta mode.\n"
                         "        -u <uid>           Numeric userid to filter on.  Multiple -u arguments are allowed.\n"
                         "\n"
-                        "This program collects some performance data for specific programs.\n"
-                        "Per program, it adds up the metrics for all matching instances, and only shows the totals.\n"
-                        "This was the reason for writing this tool: aggregation of the resource usage of\n"
-                        "all processes which are running the same program (executable file).\n"
-                        "It is called the 'delta-mode' of the tool, which is activated by the argument -d.\n"
+                        "This program collects information on the usage of the resources VSZ, RSS, and (optionally) sockets.\n"
+                        "Per program, it adds up the metrics of all running instances and shows the totals.\n"
+                        "Originally, this was the reason for writing the tool: aggregation of the resource usage\n"
+                        "of all processes which are running from the very same program (executable file).\n"
+                        "This is called the 'delta-mode' of the tool, which is activated by the argument -d.\n"
+			"Primary purpose of this mode is to detect probable memory leaks.\n"
                         "See examples 1 and 2.\n"
                         "\n"
 			"Note: rss (resident segment size) and vsz (virtual segment size) are in KiB units.\n"
-			"      utime (user time) and stime (system time) are in seconds since the start.\n"
+			"      utime (user time) and stime (system time) are in seconds since the starti of the processes.\n"
 			"\n"
                         "Example 1 (delta-mode without socket-counting):\n"
                         "        # ./cmd-metrics -d -c nginx -c cache-main -i 5\n"
                         "                      |nginx                                                                  |cache-main\n"
-                        "        datetime      |procs          vsz  delta-vsz          rss  delta-rss   %%utime   %%stime|procs          vsz  delta-vsz          rss  delta-rss   %%utime   %%stime\n"
+                        "        datetime      |procs          vsz  delta-vsz          rss  delta-rss    utime    stime|procs          vsz  delta-vsz          rss  delta-rss    utime    stime\n"
                         "        20210430113405|    9   5258100736          0   4277514240          0      0.0      0.0|    1   8768339968          0   4414558208          0      0.0      0.0\n"
                         "        20210430113410|    9   5258100736          0   4277583872      69632      5.4      3.2|    1   8768339968          0   4410761216   -3796992     18.6      0.0\n"
                         "        20210430113415|    9   5258100736          0   4277583872          0      5.6      1.2|    1   8768339968          0   4412370944    1609728     14.4      3.4\n"
                         "\n"
                         "        Example 1 gathers metrics for two programs; nginx, and cache-main (=Varnish).\n"
-			"        Every interval the metrics for the programs are printed on a single line.\n"
+			"        Every interval a single line of metrics is printed.\n"
                         "        This mode (the delta-mode) is selected by the use of argument -d.\n"
 			"        We also specified a 5-second interval, and printing the headers after every 20 cycles.\n"
                         "        In delta-mode, the program will run forever, until interrupted for instance by ^C.\n"
-                        "        Delta-mode without the option -s can safely be used on heavily loaded systems.\n"
+                        "        Delta-mode without the option -s can safely be used on heavily loaded systems with many active processes.\n"
                         "\n"
                         "Example 2 (delta-mode with socket-counting):\n"
                         "        # ./cmd-metrics -d -s -c nginx -c cache-main -i 5\n"
                         "                      |nginx                                                                                                      |cache-main\n"
-                        "        datetime      |procs          vsz  delta-vsz          rss  delta-rss   %%utime   %%stime socks dsock estab cl_wt listn  rest|procs          vsz  delta-vsz          rss  delta-rss   %%utime   %%stime socks dsock estab cl_wt listn  rest\n"
+                        "        datetime      |procs          vsz  delta-vsz          rss  delta-rss    utime    stime socks dsock estab cl_wt listn  rest|procs          vsz  delta-vsz          rss  delta-rss    utime    stime socks dsock estab cl_wt listn  rest\n"
                         "        20210430105510|    9   5257912320          0   4277346304          0      6.0      1.6   606    21   491     0    27    88|    1   8768339968          0   4419424256     331776      8.4      4.0   297    14   290     2     1     4\n"
                         "        20210430105515|    9   5257912320          0   4277362688      16384      4.0      2.6   499  -107   383     0    27    89|    1   8768339968          0   4419411968     -12288      6.0      2.0   238   -59   233     0     1     4\n"
                         "        20210430105520|    9   5258059776     147456   4277399552      36864      4.4      1.2   526    27   411     0    27    88|    1   8768339968          0   4419600384     188416     13.6      0.0   249    11   245     0     1     3\n"
@@ -120,7 +126,8 @@ void print_syntax(long ticks_per_sec, long cpu_cnt, long psize, long physpages, 
 
                         "\n"
                         "        Example 2 is equal to example 1, except for the extra option -s (include socket-counting).\n"
-                        "        WARNING: Option -s requires root-permission to gain access to socket-information of other accounts.\n"
+                        "        WARNING: Option -s requires special privileges to gain access to socket-information.\n"
+			"                 Please consult the README file for instructions on how to install the cmd-metrics object file.\n"
                         "\n"
                         "Example 3 (process listing-mode):\n"
 			"        $ cmd-metrics\n"
@@ -148,9 +155,11 @@ void print_syntax(long ticks_per_sec, long cpu_cnt, long psize, long physpages, 
                         "        varnishd       80609      1   992 varnish    43372544    5591040      1145     2064\n"
                         "        cache-main     80620  80609   992 varnish  6243368960 3189968896  10885847  3166217\n"
                         "\n"
-                        "        Example 4 lists the active processes with uid 992 (-u) and quits.\n"
-                        "        In this mode it only lists processes that match the uid.\n"
-                        "        Delta's are not included in the uid-mode.\n"
+                        "        Example 4 lists the active processes with uid's 992 and 994.\n"
+                        "        Please note that Varnish apparently runs from TWO different object files.\n"
+			"        For a complete picture, in delta mode both object files should be specified in delta mode.\n"
+                        "        So to monitor the processes in the above listing, use this command:.\n"
+			"        $ cmd-metrics -d -c nginx -c varnishd -c cache-main -i 5\n"
                         "\n"
                         "Signal handling:\n"
                         "        SIGHUP:   Reopen stdout (for logfile-rotation)\n"
@@ -163,35 +172,70 @@ void print_syntax(long ticks_per_sec, long cpu_cnt, long psize, long physpages, 
 			"        - Memory phys pages avail:  %ld\n"
 			"        - Memory page size (bytes): %ld\n"
 			"        - Memory capacity (MB):     %ld\n"
-                        "        - Clock ticks per second:   %ld\n", cpu_cnt, physpages, physpages_avail, psize, physpages*psize/(1024*1024), ticks_per_sec);
+                        "        - Clock ticks per second:   %ld\n", cpu_cnt, physpages, physpages_avail, pagesize, physpages*pagesize/(1024*1024), ticks_per_sec);
 }
 
-void list_procs(char cmd[CMD_LIST_LEN][CMD_STRING_LEN], int cmd_cnt, LLNODE_PROCINFO *llnode_cur, size_t psize, bool first_iter, bool include_threads, int ticks_per_sec) {
+
+bool include_record(char cmd[CMD_LIST_LEN][CMD_STRING_LEN], int cmd_cnt,
+                    uid_t uid[UID_LIST_LEN], int uid_cnt, bool uid_AND_cmd,
+                    char command[CMD_STRING_LEN], uid_t userid) {
     int i;
+    bool cmd_selected = false,
+         uid_selected = false,
+	 cmd_matched  = false,
+	 uid_matched  = false,
+	 result = false;
+
+    if (cmd_cnt > 0) {
+        cmd_selected = true;
+        for (i=0; i<cmd_cnt; i++) {
+            if (strncmp(cmd[i], command, strnlen(cmd[i], CMD_STRING_LEN)) == 0) {
+	        cmd_matched = true;
+		break;
+            }
+	}
+    }
+
+    if (uid_cnt > 0) {
+        uid_selected = true;
+        if ((uid_AND_cmd && cmd_matched) || (!uid_AND_cmd && !cmd_matched)) {
+            for (i=0; i<uid_cnt; i++) {
+                if (userid == uid[i]) {
+	            uid_matched = true;
+		    break;
+		}
+            }
+	}
+    }
+
+    if (uid_AND_cmd) {
+        if (cmd_matched && uid_matched) {
+	    result = true;
+	}
+    } else {
+        if (cmd_matched || uid_matched) {
+	    result = true;
+	}
+    }
+    return result;
+}
+
+void list_procs(char cmd[CMD_LIST_LEN][CMD_STRING_LEN], int cmd_cnt,
+                uid_t uid[UID_LIST_LEN], int uid_cnt, bool uid_AND_cmd,
+		LLNODE_PROCINFO *llnode_cur, bool first_iter, bool include_threads, int ticks_per_sec) {
 
     if (unlikely(first_iter)) {
         if (include_threads) {
             printf(LIST_PROCS_HEADER_FMT_STR_WITH_THREADS, LIST_PROCS_HEADER_PR_ARGS_WITH_THREADS);
-	} else {
-            printf(LIST_PROCS_HEADER_FMT_STR_NO_THREADS, LIST_PROCS_HEADER_PR_ARGS_NO_THREADS);
-	}
-    }
-    if (cmd_cnt > 0) {
-        for (i=0; i<cmd_cnt; i++) {
-            if (strncmp(cmd[i], llnode_cur->proc_info.cmd, strnlen(cmd[i], CMD_STRING_LEN)) == 0) {
-                if (include_threads) {
-                    printf(LIST_PROCS_FMT_STR_WITH_THREADS, LIST_PROCS_PR_ARGS_WITH_THREADS);
-                } else {
-                    printf(LIST_PROCS_FMT_STR_NO_THREADS, LIST_PROCS_PR_ARGS_NO_THREADS);
-                }
-            }
-        }
-    } else {
-        if (include_threads) {
-            printf(LIST_PROCS_FMT_STR_WITH_THREADS, LIST_PROCS_PR_ARGS_WITH_THREADS);
         } else {
-            printf(LIST_PROCS_FMT_STR_NO_THREADS, LIST_PROCS_PR_ARGS_NO_THREADS);
+            printf(LIST_PROCS_HEADER_FMT_STR_NO_THREADS, LIST_PROCS_HEADER_PR_ARGS_NO_THREADS);
         }
+    }
+
+    if (include_threads) {
+        printf(LIST_PROCS_FMT_STR_WITH_THREADS, LIST_PROCS_PR_ARGS_WITH_THREADS);
+    } else {
+        printf(LIST_PROCS_FMT_STR_NO_THREADS, LIST_PROCS_PR_ARGS_NO_THREADS);
     }
 }
 
@@ -226,7 +270,7 @@ void initialize_metrics(int cmd_cnt, CMD_METRICS *cmd_metrics) {
     }
 }
 
-void accumulate_cmd_metrics(char cmd[CMD_LIST_LEN][CMD_STRING_LEN], int cmd_cnt, LLNODE_PROCINFO *llnode_cur, size_t psize, CMD_METRICS *cmd_metrics) {
+void accumulate_cmd_metrics(char cmd[CMD_LIST_LEN][CMD_STRING_LEN], int cmd_cnt, LLNODE_PROCINFO *llnode_cur, CMD_METRICS *cmd_metrics) {
     int i;
     if (cmd_cnt > 0) {
         for (i=0; i<cmd_cnt; i++) {
@@ -415,17 +459,20 @@ void current_time(char *time_string) {
 }
 
 int main(int argc, char **argv) {
-    long psize           = sysconf(_SC_PAGESIZE);         // page size van het geheugen (verschilt van systeem tot systeem)
+    long pagesize        = sysconf(_SC_PAGESIZE);         // page size van het geheugen (verschilt van systeem tot systeem)
     long physpages       = sysconf(_SC_PHYS_PAGES);       // physical pages aantal
     long physpages_avail = sysconf(_SC_AVPHYS_PAGES);     // physical pages beschikbaar
     long cpu_cnt         = sysconf(_SC_NPROCESSORS_ONLN); // aantal actieve CPU's
     long ticks_per_sec   = sysconf(_SC_CLK_TCK);          // vraag de clock ticks/seconde op (verschilt van systeem tot systeem)
-    char cmd[CMD_LIST_LEN][CMD_STRING_LEN];    // eventuele programmanaam waarop gefilterd moet worden
-    uid_t uid[UID_LIST_LEN];                   // eventuele UID waaop gefilterd moet worden
+    char cmd[CMD_LIST_LEN][CMD_STRING_LEN];    // array van programmanamen waarop gefilterd moet worden
+    char command[CMD_STRING_LEN];              // werkvariable voor bovenstaande array
+    uid_t uid[UID_LIST_LEN];                   // array van UID's waaop gefilterd moet worden
+    uid_t userid;                              // werkvariable voor bovenstaande array
     bool delta_mode = false;                   // start op in delta-mode yes/no
-    bool include_sockets = false;                 // verzamel ook de tellingen van de TCP-sockets
+    bool uid_AND_cmd = false;                  // when specifying uid as well as cmd, they should both match (or not)
+    bool include_sockets = false;              // verzamel ook de tellingen van de TCP-sockets
     bool include_threads = false;              // vraag ook de threads (LWP's) van de processen op
-    bool first_iter = true, new_iter = true;
+    bool first_iter = true;
     int uid_cnt = 0;
     int cmd_cnt = 0;
     int loop_interval = 0;                     // meet-interval (in seconden)
@@ -434,13 +481,12 @@ int main(int argc, char **argv) {
     int i;
     char time_string[TIME_STRING_LEN];
     int option;
-    char *optstring = "c:dhi:r:stu:";
+    char *optstring = "ac:dhi:r:stu:";
     char *end_ptr;
     POOL *pool_ino;
     POOL **pool_ino_pp = &pool_ino;
     char *read_buf = NULL;
     long buflen = INITIAL_READBUF_SIZE;
-    char command[CMD_STRING_LEN];
 
     // Vraag de naam op van de file waar stdout naar schrijft (is waarschijnlijk gezet dmv een redirect).
     // Dit hebben we nodig voor de freopen van stdout in geval van een SIGHUP.
@@ -469,6 +515,8 @@ int main(int argc, char **argv) {
     option = getopt(argc, argv, optstring);
     while (option != -1) {
         switch (option) {
+	case 'a': uid_AND_cmd = true;
+	          break;
 	case 'c': if (cmd_cnt >= CMD_LIST_LEN) {
         	      fprintf(stderr, "ERROR: too many commands (-c) specified (maximum %d allowed)\n", CMD_LIST_LEN);
                       exit(EXIT_FAILURE);
@@ -512,7 +560,7 @@ int main(int argc, char **argv) {
                   uid_cnt++;
                   break;
         case 'h': 
-        default:  print_syntax(ticks_per_sec, cpu_cnt, psize, physpages, physpages_avail);
+        default:  print_syntax(ticks_per_sec, cpu_cnt, pagesize, physpages, physpages_avail);
                   exit(EXIT_FAILURE);
         }
         option = getopt(argc, argv, optstring);
@@ -551,27 +599,29 @@ int main(int argc, char **argv) {
 
 LOOP_THIS_BABY_FOREVER:
 
-    // Bouw een linked list op met records uit de process table.
-    llnode_start = NULL;
-    new_iter = true;
+    // Verzamel de proc data.
     if (procps_pids_new(&pids_info_data, pids_items, number_of_items) < 0) {
                 fprintf(stderr, "ERROR - procps_pids_new failed\n");
                 exit(EXIT_FAILURE);
     }
+
+    // Bouw een linked list op met records uit de process table.
+    llnode_start = NULL;
     while ((pids_stack_data = procps_pids_get(pids_info_data, include_threads ? PIDS_FETCH_THREADS_TOO : PIDS_FETCH_TASKS_ONLY))) {
-        if (cmd_cnt > 0) {
-            // Voeg alleen nodes toe voor de opgegeven commando's
+        if (cmd_cnt > 0 || uid_cnt > 0) {
+            // Voeg alleen nodes toe voor de opgegeven commando's en userid's.
             strncpy(command, PIDS_VAL(pids_cmd, str, pids_stack_data, pids_info_data), CMD_STRING_LEN);
-            for (i=0; i<cmd_cnt; i++) {
-                if (strncmp(cmd[i], command, strnlen(cmd[i], CMD_STRING_LEN)) == 0) {
-                    add_linked_list_node(&llnode_start, &llnode_cur);
-                }
+	    userid = PIDS_VAL(pids_euid, u_int, pids_stack_data, pids_info_data);
+            if (include_record(cmd, cmd_cnt, uid, uid_cnt, uid_AND_cmd, command, userid)) {
+                add_linked_list_node(&llnode_start, &llnode_cur);
             }
         } else {
-            // Voeg nodes toe voor ALLE procinfo records
+            // Er zijn geen commando's en userid's opgegeven; voeg ALLE procinfo records toe aan de linked list.
             add_linked_list_node(&llnode_start, &llnode_cur);
         }
     }
+
+    // Ruim de proc data op (alles staat nu in de linked list).
     procps_pids_unref(&pids_info_data);
 
     // Initialiseer de cmd_metrics records en verzamel de socket-metrics.
@@ -582,16 +632,16 @@ LOOP_THIS_BABY_FOREVER:
         }
     }
 
-    // Doorloop de procps linked list (llnode) en verzamel de cmd-metrics.
+    // Doorloop de linked list met proc data en verzamel de cmd-metrics.
     // Hier is een verschil tussen delta-mode=true en delta-mode=false;
-    //   - delta-mode=false: de gegevens worden binnen de loop direct afgedrukt
+    //   - delta-mode=false: de gegevens worden binnen de loop direct afgedrukt via list_procs()
     //   - delta-mode=true:  de gegevens worden binnen de loop alleen verzameld (in cmd_metrics)
     llnode_cur = llnode_start;
     while (llnode_cur != NULL) {
         if (delta_mode) {
-	    accumulate_cmd_metrics(cmd, cmd_cnt, llnode_cur, psize, cmd_metrics);                  // cmd-metrics
+	    accumulate_cmd_metrics(cmd, cmd_cnt, llnode_cur, cmd_metrics);                         // cmd-metrics
 	} else {
-            list_procs(cmd, cmd_cnt, llnode_cur, psize, first_iter, include_threads, ticks_per_sec);
+            list_procs(cmd, cmd_cnt, uid, uid_cnt, uid_AND_cmd, llnode_cur, first_iter, include_threads, ticks_per_sec);
             if (unlikely(first_iter)) {
                 first_iter = false;
             }
