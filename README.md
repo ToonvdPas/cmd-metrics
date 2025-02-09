@@ -39,11 +39,7 @@ syntax: $ cmd-metrics -d -c <cmd> [-c <cmd> ...] [-i <interval (s)>] [-r <repeat
     or: $ cmd-metrics -h         (this help text)
 
 Arguments:
-<<<<<<< HEAD
         -a                 Switch the filter options (-c and -u) to AND mode.  (default mode is OR)
-=======
-        -a                 Switch the filter options (-c and -u) to AND mode.  (default mode is OR
->>>>>>> 8e995a1 (Updated and improved the help text.)
                            In the AND mode, proc-records are only listed if both cmd and uid match.
         -c <command>       Program name (executable) to filter on.
                            Multiple -c arguments are allowed.
@@ -63,19 +59,11 @@ Arguments:
                            This option does not work in delta mode.
         -u <uid>           Numeric userid to filter on.  Multiple -u arguments are allowed.
 
-<<<<<<< HEAD
 This program collects information on the usage of the resources VSZ, RSS, and (optionally) sockets.
 Per program, it adds up the metrics of all running instances and shows the totals.
 Originally, this was the reason for writing the tool: aggregation of the resource usage
 of all processes which are running from the very same program (executable file).
 This is called the 'delta-mode' of the tool, which is activated by the argument -d.
-=======
-This program collects information on the usage of the resources VSZ, RSSi, and (optional) sockets.
-Per program, it adds up the metrics of all running instances and shows the totals.
-Originally, this was the reason for writing the tool: aggregation of the resource usage
-of all processes which are running from the very same program (executable file).
-It is called the 'delta-mode' of the tool, which is activated by the argument -d.
->>>>>>> 8e995a1 (Updated and improved the help text.)
 Primary purpose of this mode is to detect probable memory leaks.
 See examples 1 and 2.
 
@@ -146,17 +134,6 @@ Signal handling:
         SIGHUP:   Reopen stdout (for logfile-rotation)
         SIGINT:   Flush stdout and terminate.
         SIGTERM:  Flush stdout and terminate.
-<<<<<<< HEAD
-=======
-
-The OS-kernel on this system reports the following parameters:
-        - Number of active CPU's:   16
-        - Memory phys pages:        16231969
-        - Memory phys pages avail:  1870808
-        - Memory page size (bytes): 4096
-        - Memory capacity (MB):     63406
-        - Clock ticks per second:   100
->>>>>>> 8e995a1 (Updated and improved the help text.)
 ```
 # To Do
 * Reduce the number of calls to malloc() by making use of the memory-pool for the allocation of memory for the procps linked list.
