@@ -82,16 +82,16 @@ int main(int argc, char *argv[]) {
 		exit(2);
 	}
 	while ((pids_stack_data = procps_pids_get(pids_info_data, PIDS_FETCH_THREADS_TOO))) {
-		pid_cmd   = PIDS_VAL(pids_cmd,   str,     pids_stack_data, pids_info_data);
-		pid_pid   = PIDS_VAL(pids_pid,   s_int,   pids_stack_data, pids_info_data);
-		pid_ppid  = PIDS_VAL(pids_ppid,  s_int,   pids_stack_data, pids_info_data);
-		pid_tgid  = PIDS_VAL(pids_tgid,  s_int,   pids_stack_data, pids_info_data);
-		pid_euid  = PIDS_VAL(pids_euid,  u_int,   pids_stack_data, pids_info_data);
-		pid_euser = PIDS_VAL(pids_euser, str,     pids_stack_data, pids_info_data);
-		pid_vsz   = PIDS_VAL(pids_vsz,   ul_int,  pids_stack_data, pids_info_data);
-		pid_rss   = PIDS_VAL(pids_rss,   ul_int,  pids_stack_data, pids_info_data);
-		pid_utime = PIDS_VAL(pids_utime, ull_int, pids_stack_data, pids_info_data);
-		pid_stime = PIDS_VAL(pids_stime, ull_int, pids_stack_data, pids_info_data);
+		pid_cmd   = PIDS_VAL(pids_cmd,   str,     pids_stack_data);
+		pid_pid   = PIDS_VAL(pids_pid,   s_int,   pids_stack_data);
+		pid_ppid  = PIDS_VAL(pids_ppid,  s_int,   pids_stack_data);
+		pid_tgid  = PIDS_VAL(pids_tgid,  s_int,   pids_stack_data);
+		pid_euid  = PIDS_VAL(pids_euid,  u_int,   pids_stack_data);
+		pid_euser = PIDS_VAL(pids_euser, str,     pids_stack_data);
+		pid_vsz   = PIDS_VAL(pids_vsz,   ul_int,  pids_stack_data);
+		pid_rss   = PIDS_VAL(pids_rss,   ul_int,  pids_stack_data);
+		pid_utime = PIDS_VAL(pids_utime, ull_int, pids_stack_data);
+		pid_stime = PIDS_VAL(pids_stime, ull_int, pids_stack_data);
 		if (pid_pid == pid_tgid) {
 			ptype = "PROC";
 		} else {

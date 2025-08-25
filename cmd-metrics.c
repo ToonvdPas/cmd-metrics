@@ -434,16 +434,16 @@ void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int t
 
 void populate_linked_list_node(LLNODE_PROCINFO * llnode_new) {
     memset(llnode_new, 0, sizeof(LLNODE_PROCINFO));
-    strncpy(llnode_new->proc_info.cmd, PIDS_VAL(pids_cmd,     str,     pids_stack_data, pids_info_data), CMD_STRING_LEN);
-    llnode_new->proc_info.euid  = PIDS_VAL(pids_euid,         u_int,   pids_stack_data, pids_info_data);
-    strncpy(llnode_new->proc_info.euser, PIDS_VAL(pids_euser, str,     pids_stack_data, pids_info_data), CMD_STRING_LEN);
-    llnode_new->proc_info.pid   = PIDS_VAL(pids_pid,          s_int,   pids_stack_data, pids_info_data);
-    llnode_new->proc_info.ppid  = PIDS_VAL(pids_ppid,         s_int,   pids_stack_data, pids_info_data);
-    llnode_new->proc_info.tgid  = PIDS_VAL(pids_tgid,         s_int,   pids_stack_data, pids_info_data);
-    llnode_new->proc_info.vsz   = PIDS_VAL(pids_vsz,          ul_int,  pids_stack_data, pids_info_data);
-    llnode_new->proc_info.rss   = PIDS_VAL(pids_rss,          ul_int,  pids_stack_data, pids_info_data);
-    llnode_new->proc_info.utime = PIDS_VAL(pids_utime,        ull_int, pids_stack_data, pids_info_data);
-    llnode_new->proc_info.stime = PIDS_VAL(pids_stime,        ull_int, pids_stack_data, pids_info_data);
+    strncpy(llnode_new->proc_info.cmd, PIDS_VAL(pids_cmd,     str,     pids_stack_data), CMD_STRING_LEN);
+    llnode_new->proc_info.euid  = PIDS_VAL(pids_euid,         u_int,   pids_stack_data);
+    strncpy(llnode_new->proc_info.euser, PIDS_VAL(pids_euser, str,     pids_stack_data), CMD_STRING_LEN);
+    llnode_new->proc_info.pid   = PIDS_VAL(pids_pid,          s_int,   pids_stack_data);
+    llnode_new->proc_info.ppid  = PIDS_VAL(pids_ppid,         s_int,   pids_stack_data);
+    llnode_new->proc_info.tgid  = PIDS_VAL(pids_tgid,         s_int,   pids_stack_data);
+    llnode_new->proc_info.vsz   = PIDS_VAL(pids_vsz,          ul_int,  pids_stack_data);
+    llnode_new->proc_info.rss   = PIDS_VAL(pids_rss,          ul_int,  pids_stack_data);
+    llnode_new->proc_info.utime = PIDS_VAL(pids_utime,        ull_int, pids_stack_data);
+    llnode_new->proc_info.stime = PIDS_VAL(pids_stime,        ull_int, pids_stack_data);
     llnode_new->next = NULL;
 }
 
@@ -637,8 +637,8 @@ LOOP_THIS_BABY_FOREVER:
     while ((pids_stack_data = procps_pids_get(pids_info_data, include_threads ? PIDS_FETCH_THREADS_TOO : PIDS_FETCH_TASKS_ONLY))) {
         if (cmd_cnt > 0 || uid_cnt > 0) {
             // Voeg alleen nodes toe voor de opgegeven commando's en userid's.
-            strncpy(command, PIDS_VAL(pids_cmd, str, pids_stack_data, pids_info_data), CMD_STRING_LEN);
-	    userid = PIDS_VAL(pids_euid, u_int, pids_stack_data, pids_info_data);
+            strncpy(command, PIDS_VAL(pids_cmd, str, pids_stack_data), CMD_STRING_LEN);
+	    userid = PIDS_VAL(pids_euid, u_int, pids_stack_data);
             if (include_record(cmd, cmd_cnt, uid, uid_cnt, uid_AND_cmd, command, userid)) {
                 add_linked_list_node(&llnode_start, &llnode_cur);
             }
