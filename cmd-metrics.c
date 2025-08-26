@@ -216,7 +216,7 @@ bool include_record(char cmd[CMD_LIST_LEN][CMD_STRING_LEN], int cmd_cnt,
     if (cmd_cnt > 0) {
         cmd_selected = true;
         for (i=0; i<cmd_cnt; i++) {
-            if (strncmp(cmd[i], command, strnlen(cmd[i], CMD_STRING_LEN)) == 0) {
+            if (strstr(command, cmd[i]) != NULL) {
 	        cmd_matched = true;
 		break;
             }
@@ -297,17 +297,15 @@ void initialize_metrics(int cmd_cnt, CMD_METRICS *cmd_metrics) {
     }
 }
 
-void accumulate_cmd_metrics(char cmd[CMD_LIST_LEN][CMD_STRING_LEN], int cmd_cnt, LLNODE_PROCINFO *llnode_cur, CMD_METRICS *cmd_metrics) {
+void accumulate_cmd_metrics(int cmd_cnt, LLNODE_PROCINFO *llnode_cur, CMD_METRICS *cmd_metrics) {
     int i;
     if (cmd_cnt > 0) {
         for (i=0; i<cmd_cnt; i++) {
-            if (strncmp(cmd[i], llnode_cur->proc_info.cmd, strnlen(cmd[i], CMD_STRING_LEN)) == 0) {
-	        cmd_metrics[i].process_cnt++;
-                cmd_metrics[i].metric_curr.vsz   += llnode_cur->proc_info.vsz;
-                cmd_metrics[i].metric_curr.rss   += llnode_cur->proc_info.rss;
-                cmd_metrics[i].metric_curr.utime += llnode_cur->proc_info.utime;
-                cmd_metrics[i].metric_curr.stime += llnode_cur->proc_info.stime;
-            }
+            cmd_metrics[i].process_cnt++;
+            cmd_metrics[i].metric_curr.vsz   += llnode_cur->proc_info.vsz;
+            cmd_metrics[i].metric_curr.rss   += llnode_cur->proc_info.rss;
+            cmd_metrics[i].metric_curr.utime += llnode_cur->proc_info.utime;
+            cmd_metrics[i].metric_curr.stime += llnode_cur->proc_info.stime;
         }
     } else {
         fprintf(stderr, "ERROR: one or more commands must be specified when using the delta mode\n");
@@ -401,8 +399,8 @@ void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int t
                     delta_vsz,
                     cmd_metrics[i].metric_curr.rss,
                     delta_rss,
-//                    utime,   // Liever de totaaltelling dan de meting over het interval (zie onderstaand)
-//                    stime,   // Liever de totaaltelling dan de meting over het interval (zie onderstaand)
+//                    utime,   // Liever de totaaltelling dan de meting over het interval (zie hieronder)
+//                    stime,   // Liever de totaaltelling dan de meting over het interval (zie hieronder)
                     ((float)cmd_metrics[i].metric_curr.utime)/ticks_per_sec,
                     ((float)cmd_metrics[i].metric_curr.stime)/ticks_per_sec,
                     cmd_metrics[i].metric_curr.sock.sock_total,
@@ -418,8 +416,8 @@ void list_deltas(int cmd_cnt, CMD_METRICS *cmd_metrics, char *time_string, int t
                     delta_vsz,
                     cmd_metrics[i].metric_curr.rss,
                     delta_rss,
-//                    utime,   // Liever de totaaltelling dan de meting over het interval (zie onderstaand)
-//                    stime,   // Liever de totaaltelling dan de meting over het interval (zie onderstaand)
+//                    utime,   // Liever de totaaltelling dan de meting over het interval (zie hieronder)
+//                    stime,   // Liever de totaaltelling dan de meting over het interval (zie hieronder)
                     ((float)cmd_metrics[i].metric_curr.utime)/ticks_per_sec,
                     ((float)cmd_metrics[i].metric_curr.stime)/ticks_per_sec);
             }
@@ -666,7 +664,7 @@ LOOP_THIS_BABY_FOREVER:
     llnode_cur = llnode_start;
     while (llnode_cur != NULL) {
         if (delta_mode) {
-	    accumulate_cmd_metrics(cmd, cmd_cnt, llnode_cur, cmd_metrics);                         // cmd-metrics
+	    accumulate_cmd_metrics(cmd_cnt, llnode_cur, cmd_metrics);                              // cmd-metrics
 	} else {
             list_procs(cmd, cmd_cnt, uid, uid_cnt, uid_AND_cmd, llnode_cur, first_iter, include_threads, ticks_per_sec);
             if (unlikely(first_iter)) {
